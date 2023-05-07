@@ -1,52 +1,61 @@
-from fastapi import FastAPI
-from sqlalchemy import Column, Integer, String, create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+import os
+
 from uvicorn import run as uvicorn_run
+from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastapi_sqlalchemy import DBSessionMiddleware, db
+
+from models import User as ModelUser 
+from models import User
+from models import Post as ModelPost
+from models import Post
+from schema import User as SchemaUser
+from schema import Post as SchemaPost
+
+load_dotenv(".env")
 
 app = FastAPI()
-Base = declarative_base()
 
+app.add_middleware(DBSessionMiddleware, db_url=os.environ["DATABASE_URL"])
 
-engine = create_engine("postgresql://localhost/my_database")
-Base.metadata.create_all(engine)
-
-
-Session = sessionmaker(engine)
-session = Session()
+@app.get("/")
+async def root():
+    return {"message": "Hello World"}
 
 
 @app.get("/users")
 async def get_users():
   """Get all users."""
-  users = await session.query(User).all()
+  users = db.session.query(User).all()
   return users
 
 
-@app.post("/users")
-async def create_user(user: User):
+@app.post("/add-user", response_model=SchemaUser)
+async def create_user(user: SchemaUser):
   """Create a new user."""
-  await session.add(user)
-  await session.commit()
+  db_user=User(name=user.name, email=user.email)
+  db.session.add(db_user)
+  db.session.commit()
   return user
 
 
-@app.put("/users/{id}")
-async def update_user(id: int, user: User):
-  """Update an existing user."""
-  user_to_update = await session.get(User, id)
-  user_to_update.name = user.name
-  user_to_update.email = user.email
-  await session.commit()
-  return user_to_update
+# @app.put("/users/{id}")
+# async def update_user(id: int, user: User):
+#   """Update an existing user."""
+#   user_to_update = db.session.get(User, id)
+#   user_to_update.name = user.name
+#   user_to_update.email = user.email
+#   db.session.commit()
+#   return user_to_update
 
 
-@app.delete("/users/{id}")
-async def delete_user(id: int):
-  """Delete an existing user."""
-  user_to_delete = await session.get(User, id)
-  await session.delete(user_to_delete)
-  await session.commit()
-  return {}
+# @app.delete("/users/{id}")
+# async def delete_user(id: int):
+#   """Delete an existing user."""
+#   user_to_delete = db.session.get(User, id)
+#   db.session.delete(user_to_delete)
+#   db.session.commit()
+#   return {}
 
 
 if __name__ == "__main__":
